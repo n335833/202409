@@ -1,0 +1,22 @@
+Function GetRegistryValue(ByVal regPath As String, ByVal regValue As String) As String
+    Dim wshShell As Object
+    Set wshShell = CreateObject("WScript.Shell")
+    On Error Resume Next
+    GetRegistryValue = wshShell.RegRead(regPath & "\" & regValue)
+    If Err.Number <> 0 Then
+        GetRegistryValue = "Error reading registry"
+    End If
+    On Error GoTo 0
+    Set wshShell = Nothing
+End Function
+Sub ReadRegistry()
+    Dim regKey As String
+    Dim regValue As String
+    Dim value As String
+    
+    regKey = "HKEY_CURRENT_USER\Software\YourSoftware\YourKey"
+    regValue = "YourValue"
+    
+    value = GetRegistryValue(regKey, regValue)
+    MsgBox "The registry value is: " & value
+End Sub
