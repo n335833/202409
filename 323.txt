@@ -1,0 +1,92 @@
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+
+class Program
+{
+    static void Main(string[] args)
+    {
+        string connectionString = "YourConnectionStringHere"; // 設定你的資料庫連線字串
+        string tableName = "YourTableNameHere"; // 設定你要操作的資料表名稱
+
+        // 用來存放所有 bit 欄位名稱的清單
+        List<string> bitColumns = new List<string>();
+
+        using (SqlConnection connection = new SqlConnection(connectionString))
+        {
+            connection.Open();
+
+            // 查詢資料表的結構，抓取所有 bit 欄位
+            string query = @"
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = @TableName AND DATA_TYPE = 'bit'";
+
+            // 第一階段：讀取所有 bit 欄位並存入清單
+            using (SqlCommand command = new SqlCommand(query, connection))
+            {
+                command.Parameters.AddWithValue("@TableName", tableName);
+                using (SqlDataReader reader = command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        string columnName = reader["COLUMN_NAME"].ToString();
+                        bitColumns.Add(columnName);
+                    }
+                }
+            }
+
+            // 第二階段：逐一修改每個 bit 欄位的預設值
+            foreach (string columnName in bitColumns)
+            {
+                Console.WriteLine($"正在修改欄位: {columnName}");
+                SetDefaultForBitColumn(connection, tableName, columnName);
+            }
+
+            connection.Close();
+        }
+
+        Console.WriteLine("所有 bit 欄位已完成修改。");
+    }
+
+    static void SetDefaultForBitColumn(SqlConnection connection, string tableName, string columnName)
+    {
+        // 檢查並刪除現有的預設值約束
+        string dropConstraintQuery = @"
+            DECLARE @ConstraintName NVARCHAR(256)
+            SELECT @ConstraintName = Name 
+            FROM sys.default_constraints 
+            WHERE parent_object_id = OBJECT_ID(@TableName) 
+            AND parent_column_id = (
+                SELECT column_id 
+                FROM sys.columns 
+                WHERE object_id = OBJECT_ID(@TableName) 
+                AND name = @ColumnName
+            )
+
+            IF @ConstraintName IS NOT NULL
+            BEGIN
+                EXEC('ALTER TABLE ' + @TableName + ' DROP CONSTRAINT ' + @ConstraintName)
+            END";
+
+        using (SqlCommand dropConstraintCmd = new SqlCommand(dropConstraintQuery, connection))
+        {
+            dropConstraintCmd.Parameters.AddWithValue("@TableName", tableName);
+            dropConstraintCmd.Parameters.AddWithValue("@ColumnName", columnName);
+            dropConstraintCmd.ExecuteNonQuery();
+        }
+
+        // 修改該欄位的預設值為 0 並將其設為 NOT NULL
+        string alterColumnQuery = $@"
+            ALTER TABLE {tableName}
+            ADD CONSTRAINT DF_{columnName} DEFAULT 0 FOR {columnName};
+
+            ALTER TABLE {tableName}
+            ALTER COLUMN {columnName} bit NOT NULL;";
+
+        using (SqlCommand alterCommand = new SqlCommand(alterColumnQuery, connection))
+        {
+            alterCommand.ExecuteNonQuery();
+        }
+    }
+}
