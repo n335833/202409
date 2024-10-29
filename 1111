@@ -1,0 +1,22 @@
+@echo off
+
+:: 設定目標檔案路徑
+set targetPath=C:\temp\1.exe
+
+:: 設定捷徑檔案名稱，並將其放置在桌面上
+set shortcutPath=%UserProfile%\Desktop\1.lnk
+
+:: 使用 Windows Scripting Host 建立捷徑
+echo Set objShell = CreateObject("WScript.Shell") > "%temp%\CreateShortcut.vbs"
+echo Set objShortcut = objShell.CreateShortcut("%shortcutPath%") >> "%temp%\CreateShortcut.vbs"
+echo objShortcut.TargetPath = "%targetPath%" >> "%temp%\CreateShortcut.vbs"
+echo objShortcut.Save >> "%temp%\CreateShortcut.vbs"
+
+:: 執行 VBScript 來建立捷徑
+cscript //nologo "%temp%\CreateShortcut.vbs"
+
+:: 刪除暫存的 VBScript
+del "%temp%\CreateShortcut.vbs"
+
+echo 捷徑已建立在桌面上。
+pause
