@@ -1,0 +1,31 @@
+using System;
+using System.IO;
+using IWshRuntimeLibrary; // 需加入 Microsoft Scripting Runtime 參考 (Interop.IWshRuntimeLibrary.dll)
+
+namespace ShortcutCreator
+{
+    class Program
+    {
+        static void Main(string[] args)
+        {
+            // 設定捷徑目標路徑和捷徑路徑
+            string targetPath = @"C:\temp\1.exe";
+            string shortcutPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "1.lnk");
+
+            // 建立捷徑
+            CreateShortcut(shortcutPath, targetPath);
+            Console.WriteLine("捷徑已建立在桌面上。");
+        }
+
+        static void CreateShortcut(string shortcutPath, string targetPath)
+        {
+            // 建立 Windows Scripting Host COM 物件
+            WshShell shell = new WshShell();
+            IWshShortcut shortcut = (IWshShortcut)shell.CreateShortcut(shortcutPath);
+
+            // 設定捷徑的目標路徑
+            shortcut.TargetPath = targetPath;
+            shortcut.Save();
+        }
+    }
+}
