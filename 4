@@ -1,0 +1,61 @@
+using System;
+using System.Windows.Forms;
+
+namespace GridExample
+{
+    public partial class MainForm : Form
+    {
+        private DataGridView grid;
+        private Button addButton;
+        private Button removeButton;
+
+        public MainForm()
+        {
+            InitializeComponent();
+            InitializeUI();
+        }
+
+        private void InitializeUI()
+        {
+            // 設定表單大小
+            this.Size = new System.Drawing.Size(400, 400);
+
+            // 初始化 DataGridView
+            grid = new DataGridView();
+            grid.ColumnCount = 3; // 3 列
+            grid.RowCount = 7;    // 初始 7 行
+            grid.Dock = DockStyle.Top;
+            grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            this.Controls.Add(grid);
+
+            // 添加按鈕
+            addButton = new Button();
+            addButton.Text = "添加行";
+            addButton.Dock = DockStyle.Left;
+            addButton.Click += new EventHandler(AddRow);
+            this.Controls.Add(addButton);
+
+            // 移除按鈕
+            removeButton = new Button();
+            removeButton.Text = "移除行";
+            removeButton.Dock = DockStyle.Right;
+            removeButton.Click += new EventHandler(RemoveRow);
+            this.Controls.Add(removeButton);
+        }
+
+        // 添加一行
+        private void AddRow(object sender, EventArgs e)
+        {
+            grid.Rows.Add();
+        }
+
+        // 移除最後一行
+        private void RemoveRow(object sender, EventArgs e)
+        {
+            if (grid.Rows.Count > 0)
+            {
+                grid.Rows.RemoveAt(grid.Rows.Count - 1);
+            }
+        }
+    }
+}
