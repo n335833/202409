@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace GridExample
@@ -6,8 +7,7 @@ namespace GridExample
     public partial class MainForm : Form
     {
         private DataGridView grid;
-        private Button addButton;
-        private Button removeButton;
+        private Button addColumnButton;
 
         public MainForm()
         {
@@ -18,44 +18,68 @@ namespace GridExample
         private void InitializeUI()
         {
             // 設定表單大小
-            this.Size = new System.Drawing.Size(400, 400);
+            this.Size = new System.Drawing.Size(600, 300);
 
             // 初始化 DataGridView
             grid = new DataGridView();
-            grid.ColumnCount = 3; // 3 列
-            grid.RowCount = 7;    // 初始 7 行
+            grid.ColumnCount = 7; // 初始 7 列
+            grid.RowCount = 3;    // 初始 3 行
             grid.Dock = DockStyle.Top;
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            grid.AllowUserToAddRows = false; // 禁止自動添加行
+            grid.CellEndEdit += Grid_CellEndEdit; // 當儲存格編輯結束後觸發
             this.Controls.Add(grid);
 
-            // 添加按鈕
-            addButton = new Button();
-            addButton.Text = "添加行";
-            addButton.Dock = DockStyle.Left;
-            addButton.Click += new EventHandler(AddRow);
-            this.Controls.Add(addButton);
+            // 設置最後一列為只讀，用來顯示平均值
+            grid.Columns[grid.ColumnCount - 1].ReadOnly = true;
+            grid.Columns[grid.ColumnCount - 1].HeaderText = "平均值";
 
-            // 移除按鈕
-            removeButton = new Button();
-            removeButton.Text = "移除行";
-            removeButton.Dock = DockStyle.Right;
-            removeButton.Click += new EventHandler(RemoveRow);
-            this.Controls.Add(removeButton);
+            // 添加「添加列」按鈕
+            addColumnButton = new Button();
+            addColumnButton.Text = "添加列";
+            addColumnButton.Dock = DockStyle.Right;
+            addColumnButton.Click += new EventHandler(AddColumn);
+            this.Controls.Add(addColumnButton);
         }
 
-        // 添加一行
-        private void AddRow(object sender, EventArgs e)
+        // 當儲存格編輯結束時計算平均值
+        private void Grid_CellEndEdit(object sender, DataGridViewCellEventArgs e)
         {
-            grid.Rows.Add();
+            CalculateRowAverage(e.RowIndex);
         }
 
-        // 移除最後一行
-        private void RemoveRow(object sender, EventArgs e)
+        // 計算指定行的平均值
+        private void CalculateRowAverage(int rowIndex)
         {
-            if (grid.Rows.Count > 0)
+            try
             {
-                grid.Rows.RemoveAt(grid.Rows.Count - 1);
+                // 取得該行前6個格子的數值
+                var values = Enumerable.Range(0, grid.ColumnCount - 1)
+                                       .Select(col => grid.Rows[rowIndex].Cells[col].Value)
+                                       .Where(val => val != null && double.TryParse(val.ToString(), out _))
+                                       .Select(val => Convert.ToDouble(val))
+                                       .ToList();
+
+                // 計算平均值並顯示在最右側的列
+                double average = values.Count > 0 ? values.Average() : 0;
+                grid.Rows[rowIndex].Cells[grid.ColumnCount - 1].Value = average;
             }
+            catch
+            {
+                grid.Rows[rowIndex].Cells[grid.ColumnCount - 1].Value = "錯誤";
+            }
+        }
+
+        // 添加一列
+        private void AddColumn(object sender, EventArgs e)
+        {
+            int newColumnIndex = grid.Columns.Count - 1;
+            grid.Columns.Insert(newColumnIndex, new DataGridViewTextBoxColumn());
+            grid.Columns[newColumnIndex].HeaderText = "Column " + (newColumnIndex + 1);
+
+            // 更新最後一列為只讀，並設置標題為「平均值」
+            grid.Columns[grid.ColumnCount - 1].ReadOnly = true;
+            grid.Columns[grid.ColumnCount - 1].HeaderText = "平均值";
         }
     }
 }
