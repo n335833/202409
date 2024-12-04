@@ -1,0 +1,121 @@
+Sub FillDBList(strTablename As String)
+    On Error GoTo Exit_DBList
+    
+    Dim rstCopyTable As New ADODB.Recordset
+    Dim rst As New ADODB.Recordset
+    Dim strColumnList() As String
+    Dim strColumnHeadList() As String
+    Dim strList As String
+    Dim strLength As String
+    Dim intColumnCount As Integer
+    Dim intSelectCount As Integer
+    Dim strKey As String
+    Dim strSort As String
+    Dim strSQL As String
+    Dim i As Integer
+    Dim j As Integer
+    Dim index As Integer
+    
+    ' 1. 取得 Table 標題及 SQL
+    rstCopyTable.Open "SELECT Description, [SQL] FROM tCopyTable WHERE TableName='" & strTablename & "'", CurrentProject.Connection
+    If rstCopyTable.RecordCount = 0 Then
+        MsgBox "無相關複製資料表設定，請洽系統管理員!"
+        Exit Sub
+    End If
+    Me.Caption = "複製-" & rstCopyTable.Fields("Description")
+    strSQL = rstCopyTable.Fields("SQL")
+    rstCopyTable.Close
+    
+    ' 2. 合併查詢取得所需欄位資訊
+    rst.Open "SELECT MapColumnName, ShowFlag, SortOrder, DisplayOrder, Datatype, ColumnName, Caption " & _
+             "FROM tCopyTableDetail WHERE TableName='" & strTablename & "' " & _
+             "AND (ShowFlag IN ('Y', 'K') OR SortOrder > 0) ORDER BY DisplayOrder", CurrentProject.Connection
+    
+    ' 初始化陣列
+    Dim tempColumns() As String
+    Dim tempSortColumns() As String
+    Dim tempHeadList() As String
+    
+    intColumnCount = 0
+    i = 0
+    Do While Not rst.EOF
+        ' 處理顯示欄位
+        If rst.Fields("ShowFlag") = "Y" Then
+            intColumnCount = intColumnCount + 1
+            ReDim Preserve tempColumns(1 To intColumnCount)
+            ReDim Preserve tempHeadList(1 To intColumnCount, 1 To 3)
+            
+            tempHeadList(intColumnCount, 1) = Nz(rst.Fields("ColumnName"), "9999999999")
+            tempHeadList(intColumnCount, 2) = rst.Fields("Datatype")
+            tempHeadList(intColumnCount, 3) = rst.Fields("Caption")
+        End If
+        
+        ' 處理排序欄位
+        If Nz(rst.Fields("SortOrder"), 0) > 0 Then
+            i = i + 1
+            ReDim Preserve tempSortColumns(1 To i)
+            tempSortColumns(i) = rst.Fields("MapColumnName") & " DESC"
+        End If
+        
+        ' 處理搜尋主鍵
+        If rst.Fields("ShowFlag") = "K" Then
+            strKey = "a." & rst.Fields("MapColumnName")
+        End If
+        
+        rst.MoveNext
+    Loop
+    rst.Close
+    
+    If i > 0 Then strSort = " ORDER BY " & Join(tempSortColumns, ", ")
+    
+    ' 3. 從 DB2 取得舊資料
+    Call ChkCon
+    rst.Open strSQL & " WHERE " & strKey & "='" & Me.txtBAN & "' " & strSort & " FETCH FIRST 150 ROWS ONLY", gConDB2
+    
+    ' 初始化陣列
+    ReDim strColumnList(1 To 150, 1 To intColumnCount)
+    intSelectCount = 0
+    Do While Not rst.EOF
+        intSelectCount = intSelectCount + 1
+        For j = 1 To intColumnCount
+            strColumnList(intSelectCount, j) = Nz(rst.Fields(tempHeadList(j, 1)), " ")
+        Next j
+        rst.MoveNext
+    Loop
+    rst.Close
+    
+    ' 4. 顯示資料
+    Dim arrList() As String
+    Dim arrLength() As String
+    
+    ' 設定標題
+    ReDim arrLength(1 To intColumnCount)
+    strList = ""
+    For j = 1 To intColumnCount
+        arrLength(j) = Len(tempHeadList(j, 3)) * 0.5 & " cm"
+    Next j
+    
+    ' 設定內容
+    index = 1
+    ReDim arrList(1 To intSelectCount * intColumnCount)
+    For i = 1 To intSelectCount
+        For j = 1 To intColumnCount
+            arrList(index) = Trim(strColumnList(i, j))
+            index = index + 1
+        Next j
+    Next i
+    
+    Me.lstDataList.ColumnCount = intColumnCount
+    Me.lstDataList.ColumnHeads = True
+    Me.lstDataList.RowSource = Join(arrList, ";")
+    Me.lstDataList.ColumnWidths = Join(arrLength, ";")
+    
+Exit_DBList:
+    If Not rst Is Nothing Then If rst.State = adStateOpen Then rst.Close
+    If Not rstCopyTable Is Nothing Then If rstCopyTable.State = adStateOpen Then rstCopyTable.Close
+    Exit Sub
+    
+Resume_Exit_DBList:
+    MsgBox "連接主機失敗，請聯絡系統管理員!" & Err.Description
+    Resume Exit_DBList
+End Sub
