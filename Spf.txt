@@ -1,0 +1,48 @@
+CREATE PROCEDURE usp_GetDataList
+    @TableName NVARCHAR(255),
+    @BAN NVARCHAR(50),
+    @FetchRows INT = 150 -- 限制返回的筆數
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- 確認是否存在相關設定
+    IF NOT EXISTS (SELECT 1 FROM tCopyTable WHERE TableName = @TableName)
+    BEGIN
+        RAISERROR('無相關複製資料表設定，請洽系統管理員!', 16, 1);
+        RETURN;
+    END
+
+    -- 定義變數來儲存動態欄位名稱
+    DECLARE @ColumnList NVARCHAR(MAX) = '';
+    DECLARE @SortOrder NVARCHAR(MAX) = '';
+    DECLARE @KeyColumn NVARCHAR(255) = '';
+
+    -- 動態組建欄位清單和排序規則
+    SELECT 
+        @ColumnList = STRING_AGG(QUOTENAME(MapColumnName), ', '),
+        @SortOrder = STRING_AGG(QUOTENAME(MapColumnName) + ' DESC', ', '),
+        @KeyColumn = MAX(CASE WHEN ShowFlag = 'K' THEN MapColumnName END)
+    FROM tCopyTableDetail
+    WHERE TableName = @TableName AND (ShowFlag IN ('Y', 'K') OR SortOrder > 0);
+
+    -- 如果無顯示欄位或無搜尋主鍵，則退出
+    IF @ColumnList IS NULL OR @KeyColumn IS NULL
+    BEGIN
+        RAISERROR('無設定顯示欄位或搜尋主鍵!', 16, 1);
+        RETURN;
+    END
+
+    -- 組建動態查詢 SQL 來獲取資料
+    DECLARE @SQL NVARCHAR(MAX) = '
+        SELECT TOP (@FetchRows) ' + @ColumnList + '
+        FROM (' + (SELECT [SQL] FROM tCopyTable WHERE TableName = @TableName) + ') AS a
+        WHERE a.' + QUOTENAME(@KeyColumn) + ' = @BAN';
+
+    IF @SortOrder IS NOT NULL AND @SortOrder <> ''
+        SET @SQL = @SQL + ' ORDER BY ' + @SortOrder;
+
+    -- 執行動態 SQL 查詢並返回結果
+    EXEC sp_executesql @SQL, N'@BAN NVARCHAR(50), @FetchRows INT', @BAN, @FetchRows;
+END;
+GO
