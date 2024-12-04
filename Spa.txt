@@ -1,0 +1,81 @@
+Sub FillDBList_SP(strTablename As String)
+    On Error GoTo Exit_DBList
+    
+    Dim rst As New ADODB.Recordset
+    Dim cmd As New ADODB.Command
+    Dim conn As ADODB.Connection
+    Dim strList As String
+    Dim strLength As String
+    Dim intColumnCount As Integer
+    Dim intSelectCount As Integer
+    Dim i As Integer
+    Dim j As Integer
+    
+    ' 初始化連線
+    Set conn = CurrentProject.Connection
+    Set cmd = New ADODB.Command
+    cmd.ActiveConnection = conn
+    cmd.CommandText = "usp_GetDataList"
+    cmd.CommandType = adCmdStoredProc
+    
+    ' 傳遞參數
+    cmd.Parameters.Append cmd.CreateParameter("@TableName", adVarChar, adParamInput, 255, strTablename)
+    cmd.Parameters.Append cmd.CreateParameter("@BAN", adVarChar, adParamInput, 50, Me.txtBAN)
+    cmd.Parameters.Append cmd.CreateParameter("@FetchRows", adInteger, adParamInput, , 150)
+    
+    ' 執行儲存過程取得 SQL Server 資料
+    Set rst = cmd.Execute
+    
+    ' 處理返回的資料
+    intColumnCount = rst.Fields.Count
+    intSelectCount = 0
+    
+    Dim arrList() As String
+    Dim arrLength() As String
+    
+    ReDim arrList(1 To 150 * intColumnCount)
+    ReDim arrLength(1 To intColumnCount)
+    
+    ' 顯示標題
+    For j = 0 To intColumnCount - 1
+        arrLength(j + 1) = Len(rst.Fields(j).Name) * 0.5 & " cm"
+    Next j
+    
+    ' 顯示詳細資料
+    i = 1
+    Do While Not rst.EOF
+        For j = 0 To intColumnCount - 1
+            arrList(i) = Nz(rst.Fields(j).Value, " ")
+            i = i + 1
+        Next j
+        rst.MoveNext
+    Loop
+    
+    ' 查詢 DB2 資料
+    Dim rstDB2 As New ADODB.Recordset
+    Dim connDB2 As New ADODB.Connection
+    connDB2.ConnectionString = "Provider=IBMDA400;Data Source=DB2_SERVER;User ID=your_user_id;Password=your_password"
+    connDB2.Open
+    
+    Dim strSQLDB2 As String
+    strSQLDB2 = "SELECT * FROM DB2_TABLE WHERE some_column = '" & Me.txtBAN & "' FETCH FIRST 150 ROWS ONLY"
+    
+    rstDB2.Open strSQLDB2, connDB2
+    
+    ' 這裡可以處理 DB2 返回的資料，將其顯示或合併到列表中
+    ' 略過資料處理的部分
+
+    Me.lstDataList.ColumnCount = intColumnCount
+    Me.lstDataList.ColumnHeads = True
+    Me.lstDataList.RowSource = Join(arrList, ";")
+    Me.lstDataList.ColumnWidths = Join(arrLength, ";")
+    
+Exit_DBList:
+    If Not rst Is Nothing Then If rst.State = adStateOpen Then rst.Close
+    If Not rstDB2 Is Nothing Then If rstDB2.State = adStateOpen Then rstDB2.Close
+    Exit Sub
+    
+Resume_Exit_DBList:
+    MsgBox "連接主機失敗，請聯絡系統管理員!" & Err.Description
+    Resume Exit_DBList
+End Sub
