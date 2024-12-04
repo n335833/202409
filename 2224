@@ -1,0 +1,35 @@
+Dim rst As New ADODB.Recordset
+Dim arrData() As Variant
+Dim i As Integer
+
+' 合併查詢減少資料庫存取次數
+strsql = "SELECT MapColumnName, SortOrder, ColumnName, Datatype, Caption " & _
+         "FROM tCopyTableDetail " & _
+         "WHERE TableName='" & strTablename & "' AND ShowFlag IN ('Y', 'K') ORDER BY DisplayOrder"
+ROpen rst, strsql
+
+' 預先將資料載入陣列
+arrData = rst.GetRows
+rst.Close
+
+Dim keyColumns As String
+Dim sortColumns As String
+keyColumns = ""
+sortColumns = ""
+
+' 處理主鍵和排序欄位
+For i = LBound(arrData, 2) To UBound(arrData, 2)
+    If arrData(1, i) = "K" Then
+        keyColumns = keyColumns & "a." & arrData(0, i) & ","
+    End If
+    If Not IsNull(arrData(1, i)) And arrData(1, i) > 0 Then
+        sortColumns = sortColumns & arrData(0, i) & " DESC,"
+    End If
+Next i
+
+If keyColumns <> "" Then keyColumns = Left(keyColumns, Len(keyColumns) - 1)
+If sortColumns <> "" Then sortColumns = " ORDER BY " & Left(sortColumns, Len(sortColumns) - 1)
+
+' 使用篩選條件進行查詢
+strsql = "SELECT * FROM (" & strsql & ") WHERE " & keyColumns & "='" & Me.txtBAN & "'" & sortColumns & " FETCH FIRST 150 ROWS ONLY"
+ROpen rst, strsql
