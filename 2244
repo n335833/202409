@@ -1,0 +1,17 @@
+Sub ShowLoading()
+    ' 打開 Loading 表單
+    DoCmd.OpenForm "frmLoading"
+    Forms!frmLoading.Repaint
+
+    ' 模擬耗時操作
+    Dim i As Integer
+    For i = 1 To 100
+        DoEvents
+        Forms!frmLoading.Controls("ProgressBar").Width = i * 2 ' 更新進度條
+        Forms!frmLoading.Controls("lblStatus").Caption = "載入中: " & i & "%"
+        Forms!frmLoading.Repaint
+    Next i
+
+    ' 處理完成後關閉 Loading 表單
+    DoCmd.Close acForm, "frmLoading"
+End Sub
