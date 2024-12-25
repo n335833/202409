@@ -1,0 +1,54 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM 設定目標資料夾
+set folder=C:\log
+
+REM 取得當前日期，假設格式為 YYYY/MM/DD 或 YYYY-MM-DD
+for /f "tokens=1-3 delims=/- " %%A in ("%date%") do (
+    set year=%%A
+    set month=%%B
+    set day=%%C
+)
+
+REM 計算7天前的日期
+call :SubtractDays %year% %month% %day% 7
+set cutoffDate=%year%-%month%-%day%
+
+REM 遍歷目標資料夾的所有文件
+for %%F in ("%folder%\*.*") do (
+    set "filename=%%~nF"
+    if "!filename!"=="%cutoffDate%" (
+        echo 刪除文件: %%F
+        del "%%F"
+    )
+)
+
+pause
+exit /b
+
+REM 日期計算函數（SubtractDays）
+:SubtractDays
+set /a year=%1
+set /a month=%2
+set /a day=%3
+set /a subtract=%4
+
+REM 將當前日期轉換為總天數
+if %month% lss 3 set /a month+=12 & set /a year-=1
+set /a totalDays=(1461 * %year% / 4) + (153 * (%month% + 1) / 5) + %day% - 621049
+
+REM 減去天數
+set /a totalDays-=%subtract%
+
+REM 將總天數轉換回年月日
+set /a year=(4 * %totalDays% + 2) / 1461
+set /a remainingDays=%totalDays% - (1461 * %year% / 4)
+set /a month=(5 * %remainingDays% + 2) / 153
+set /a day=%remainingDays% - (153 * %month% + 2) / 5 + 1
+if %month% gtr 12 set /a month-=12 & set /a year+=1
+
+REM 格式化輸出
+if %month% lss 10 set month=0%month%
+if %day% lss 10 set day=0%day%
+exit /b
