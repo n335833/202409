@@ -1,0 +1,19 @@
+@echo off
+:: 定义目标目录
+set "target_dir=C:\logs"
+
+:: 获取当前日期并减去7天
+for /f "tokens=1-4 delims=/ " %%a in ('%date%') do (
+    set year=%%d
+    set month=%%b
+    set day=%%c
+)
+
+:: 使用 PowerShell 计算 7 天前的日期
+for /f "tokens=*" %%i in ('powershell -NoProfile -Command "(Get-Date).AddDays(-7).ToString('yyyyMMdd')"') do set old_date=%%i
+
+:: 遍历目标目录并删除早于 7 天的文件
+forfiles /p "%target_dir%" /s /m *.* /d -7 /c "cmd /c del @path"
+
+echo 清理完成！
+pause
