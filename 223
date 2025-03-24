@@ -1,0 +1,124 @@
+Sub CopyTableData()
+    Dim rst As DAO.Recordset
+    Dim rstCopyTable As DAO.Recordset
+    Dim strTablename As String
+    Dim strSQL As String
+    Dim strKey As String
+    Dim strSort As String
+    Dim intColumnCount As Integer
+    Dim intSelectCount As Integer
+    Dim i As Integer, j As Integer
+    Dim strList As String
+    Dim strLength As String
+    Dim strColumnHeadList() As String
+    Dim strColumnList() As String
+
+    ' 設定表格名稱（假設來自表單輸入）
+    strTablename = Nz(Me.txtTableName, "")
+
+    ' 取得Table標題及SQL
+    ROpen rstCopyTable, "SELECT Description, [SQL] FROM tCopyTable WHERE TableName='" & strTablename & "'"
+    If rstCopyTable.EOF Then
+        MsgBox "無相關複製資料表設定，請洽系統管理員!", vbExclamation
+        Exit Sub
+    End If
+    
+    Me.Caption = "複製-" & Nz(rstCopyTable.Fields("Description"), "")
+    strSQL = Nz(rstCopyTable.Fields("SQL"), "")
+    rstCopyTable.Close
+
+    ' 取得 TABLE COLUMNS 數
+    ROpen rst, "SELECT COUNT(*) AS RC FROM tCopyTableDetail WHERE TableName='" & strTablename & "' AND ShowFlag='Y'"
+    If Not rst.EOF Then
+        intColumnCount = Nz(rst.Fields("RC"), 0)
+    End If
+    rst.Close
+    If intColumnCount = 0 Then Exit Sub  ' 無設定則離開
+
+    ' 取得搜尋主鍵
+    ROpen rst, "SELECT TOP 1 ColumnName FROM tCopyTableDetail WHERE TableName='" & strTablename & "' AND ShowFlag='K'"
+    If Not rst.EOF Then
+        strKey = Nz(rst.Fields("ColumnName"), "")
+    End If
+    rst.Close
+
+    ' 取得排序欄位
+    strSort = ""
+    ROpen rst, "SELECT ColumnName FROM tCopyTableDetail WHERE TableName='" & strTablename & "' AND SortOrder>0"
+    If Not rst.EOF Then
+        Do
+            strSort = strSort & rst.Fields("ColumnName") & " DESC,"
+            rst.MoveNext
+        Loop Until rst.EOF
+    End If
+    rst.Close
+    
+    ' 如果有排序欄位則組合 ORDER BY
+    If Len(strSort) > 0 Then
+        strSort = " ORDER BY " & Left(strSort, Len(strSort) - 1)
+    End If
+
+    ' 取得欄位明細
+    ReDim strColumnHeadList(1 To intColumnCount, 1 To 4)
+    ROpen rst, "SELECT * FROM tCopyTableDetail WHERE TableName='" & strTablename & "' AND ShowFlag='Y' ORDER BY DisplayOrder"
+    i = 0
+    Do Until rst.EOF
+        i = i + 1
+        strColumnHeadList(i, 1) = Nz(rst.Fields("ColumnName"), "")
+        strColumnHeadList(i, 2) = Nz(rst.Fields("Datatype"), "")
+        strColumnHeadList(i, 3) = Nz(rst.Fields("Caption"), "")
+        strColumnHeadList(i, 4) = Nz(rst.Fields("MapColumnName"), "")
+        rst.MoveNext
+    Loop
+    rst.Close
+
+    ' 設定 ListBox 標題
+    Me.lstDataListSQL.ColumnCount = intColumnCount
+    Me.lstDataListSQL.ColumnHeads = True
+
+    ' 取得 SQL Server (合併報表) 舊資料
+    If strKey <> "" Then
+        ROpen rst, "SELECT TOP 150 " & strTablename & ".* FROM " & strTablename & _
+                   " WHERE " & strKey & "='" & Nz(Me.txtBAN, "") & "'" & _
+                   " AND RPT_TYPE='" & Nz(Me.cboRPT_TYPE, "") & "'" & _
+                   " AND Amend_CNT='" & Nz(Me.txtAMEND_CNT, "") & "'" & strSort
+    Else
+        Exit Sub
+    End If
+
+    ' 初始化資料存儲
+    ReDim strColumnList(1 To 150, 1 To intColumnCount)
+    
+    ' 讀取查詢結果
+    intSelectCount = 0
+    Do Until rst.EOF
+        intSelectCount = intSelectCount + 1
+        For i = 1 To intColumnCount
+            strColumnList(intSelectCount, i) = Nz(rst.Fields(Trim(strColumnHeadList(i, 1))), " ")
+        Next i
+        rst.MoveNext
+    Loop
+    rst.Close
+
+    ' 設定 ListBox 標題
+    strList = ""
+    strLength = ""
+    For j = 1 To intColumnCount
+        strList = strList & strColumnHeadList(j, 3) & ";"
+        strLength = strLength & Len(strColumnHeadList(j, 3)) * 0.5 & " cm;"
+    Next j
+
+    ' 使用 ListBox.AddItem 來填充資料
+    Me.lstDataListSQL.Clear
+    For i = 1 To intSelectCount
+        Dim itemStr As String
+        itemStr = ""
+        For j = 1 To intColumnCount
+            itemStr = itemStr & strSubSemiCol(Trim(strColumnList(i, j))) & ";"
+        Next j
+        Me.lstDataListSQL.AddItem Left(itemStr, Len(itemStr) - 1) ' 去掉最後的 ";"
+    Next i
+
+    ' 設定欄位寬度
+    Me.lstDataListSQL.ColumnWidths = strLength
+End Sub
